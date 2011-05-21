@@ -1,8 +1,5 @@
 package jig;
 
-import static com.google.common.base.Preconditions.checkState;
-
-import com.google.common.collect.ForwardingIterator;
 import com.google.common.collect.ForwardingSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -15,29 +12,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
-  private final class VertexIterator extends ForwardingIterator<V> {
-    private final Iterator<V> backingIterator;
-    private V prev = null;
-
-    private VertexIterator(Iterator<V> backingIterator) {
-      this.backingIterator = backingIterator;
-    }
-
-    @Override protected Iterator<V> delegate() {
-      return backingIterator;
-    }
-
-    @Override public V next() {
-      return prev = super.next();
-    }
-
-    @Override public void remove() {
-      checkState(prev != null);
-      removeVertex(prev);
-    }
-  }
-
+public class MapGraph<V> extends AbstractGraph<V> {
   final class Adj extends AbstractContext<V> {
     private final V v;
     private final Set<V> suc;
@@ -51,12 +26,12 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
       this.pre = Sets.newLinkedHashSet();
     }
 
-    public Set<V> successors() {
-      return (sucView == null) ? sucView = new SuccessorSet(v, suc) : sucView;
-    }
-
     public Set<V> predecessors() {
       return (preView == null) ? preView = new PredecessorSet(v, pre) : preView;
+    }
+
+    public Set<V> successors() {
+      return (sucView == null) ? sucView = new SuccessorSet(v, suc) : sucView;
     }
 
     @Override public V vertex() {
@@ -73,26 +48,28 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
       this.backing = backing;
     }
 
-    @Override protected Set<V> delegate() {
-      return backing;
-    }
-
-    protected abstract Set<V> getReverseSet(Object w);
-
-    @Override public Iterator<V> iterator() {
-      return new VertexIterator(super.iterator());
-    }
-
-    @Override public boolean removeAll(Collection<?> collection) {
-      return standardRemoveAll(collection);
-    }
-
     @Override public boolean add(V w) {
       if (super.add(w)) {
+        MapGraph.this.add(w);
         getReverseSet(w).add(v);
         return true;
       }
       return false;
+    }
+
+    @Override public boolean addAll(Collection<? extends V> collection) {
+      return standardAddAll(collection);
+    }
+
+    @Override public void clear() {
+      for (V w : this) {
+        getReverseSet(w).remove(v);
+      }
+      super.clear();
+    }
+
+    @Override public Iterator<V> iterator() {
+      return new VertexIterator(super.iterator());
     }
 
     @Override public boolean remove(@Nullable Object w) {
@@ -103,19 +80,28 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
       return false;
     }
 
-    @Override public boolean addAll(Collection<? extends V> collection) {
-      return standardAddAll(collection);
+    @Override public boolean removeAll(Collection<?> collection) {
+      return standardRemoveAll(collection);
     }
 
     @Override public boolean retainAll(Collection<?> collection) {
       return standardRetainAll(collection);
     }
 
-    @Override public void clear() {
-      for (V w : this) {
-        getReverseSet(w).remove(v);
-      }
-      super.clear();
+    @Override protected Set<V> delegate() {
+      return backing;
+    }
+
+    protected abstract Set<V> getReverseSet(Object w);
+  }
+
+  final class PredecessorSet extends AdjacentSet {
+    PredecessorSet(V v, Set<V> backing) {
+      super(v, backing);
+    }
+
+    @Override protected Set<V> getReverseSet(Object w) {
+      return adj.get(w).suc;
     }
   }
 
@@ -129,17 +115,31 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
     }
   }
 
-  final class PredecessorSet extends AdjacentSet {
-    PredecessorSet(V v, Set<V> backing) {
-      super(v, backing);
-    }
+  private final Map<V, Adj> adj;
 
-    @Override protected Set<V> getReverseSet(Object w) {
-      return adj.get(w).suc;
-    }
+  public MapGraph() {
+    this.adj = Maps.newLinkedHashMap();
   }
 
-  private final Map<V, Adj> adj;
+  public MapGraph(Set<V> vertices) {
+    this.adj = new LinkedHashMap<V, Adj>(vertices.size());
+    addAll(vertices);
+  }
+
+  @Override public boolean add(V v) {
+    if (adj.containsKey(v))
+      return false;
+    adj.put(v, new Adj(v));
+    return true;
+  }
+
+  @Override public void clear() {
+    adj.clear();
+  }
+
+  @Override public Iterator<V> iterator() {
+    return new VertexIterator(adj.keySet().iterator());
+  }
 
   @Override public Context<V> match(@Nullable Object v) {
     return adj.get(v);
@@ -158,44 +158,7 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
     return Contexts.unmodifiableContext(vAdj);
   }
 
-  public MapGraph() {
-    this.adj = Maps.newLinkedHashMap();
-  }
-
-  public MapGraph(Set<V> vertices) {
-    this.adj = new LinkedHashMap<V, Adj>(vertices.size());
-    addAll(vertices);
-  }
-
-  @Override public boolean remove(@Nullable Object object) {
-    return removeVertex(object) != null;
-  }
-
-  @Override public Iterator<V> iterator() {
-    final Iterator<V> backingIterator = super.iterator();
-    return new VertexIterator(backingIterator);
-  }
-
-  @Override public boolean removeAll(Collection<?> collection) {
-    return standardRemoveAll(collection);
-  }
-
-  @Override public boolean add(V v) {
-    if (adj.containsKey(v))
-      return false;
-    adj.put(v, new Adj(v));
-    return true;
-  }
-
-  @Override public boolean retainAll(Collection<?> collection) {
-    return standardRetainAll(collection);
-  }
-
-  @Override public void clear() {
-    adj.clear();
-  }
-
-  @Override protected Set<V> delegate() {
-    return adj.keySet();
+  @Override public int size() {
+    return adj.size();
   }
 }
