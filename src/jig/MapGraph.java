@@ -4,18 +4,41 @@ import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.collect.ForwardingIterator;
 import com.google.common.collect.ForwardingSet;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
 
 public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
-  final class Adj implements Context<V> {
+  private final class VertexIterator extends ForwardingIterator<V> {
+    private final Iterator<V> backingIterator;
+    private V prev = null;
+
+    private VertexIterator(Iterator<V> backingIterator) {
+      this.backingIterator = backingIterator;
+    }
+
+    @Override protected Iterator<V> delegate() {
+      return backingIterator;
+    }
+
+    @Override public V next() {
+      return prev = super.next();
+    }
+
+    @Override public void remove() {
+      checkState(prev != null);
+      removeVertex(prev);
+    }
+  }
+
+  final class Adj extends AbstractContext<V> {
     private final V v;
     private final Set<V> suc;
     private final Set<V> pre;
@@ -57,23 +80,7 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
     protected abstract Set<V> getReverseSet(Object w);
 
     @Override public Iterator<V> iterator() {
-      final Iterator<V> backingIterator = super.iterator();
-      return new ForwardingIterator<V>() {
-        private V prev = null;
-
-        @Override protected Iterator<V> delegate() {
-          return backingIterator;
-        }
-
-        @Override public V next() {
-          return prev = super.next();
-        }
-
-        @Override public void remove() {
-          checkState(prev != null);
-          AdjacentSet.this.remove(prev);
-        }
-      };
+      return new VertexIterator(super.iterator());
     }
 
     @Override public boolean removeAll(Collection<?> collection) {
@@ -134,46 +141,58 @@ public class MapGraph<V> extends ForwardingSet<V> implements Graph<V> {
 
   private final Map<V, Adj> adj;
 
-  @Override public boolean isEmpty() {
-    return adj.isEmpty();
-  }
-
   @Override public Context<V> match(@Nullable Object v) {
     return adj.get(v);
   }
 
   @Override public Context<V> matchAny() {
-    // TODO Auto-generated method stub
-    return null;
+    return adj.values().iterator().next();
   }
 
   @Override public Context<V> removeVertex(@Nullable Object v) {
     Adj vAdj = adj.remove(v);
-    final V vertex = vAdj.vertex();
-    final Set<V> pre = Collections.unmodifiableSet(vAdj.pre);
-    final Set<V> suc = Collections.unmodifiableSet(vAdj.suc);
-    for (V w : pre)
+    for (V w : vAdj.pre)
       adj.get(w).suc.remove(v);
-    for (V w : suc)
+    for (V w : vAdj.suc)
       adj.get(w).pre.remove(v);
-    
-    return new Context<V>() {
-      @Override public V vertex() {
-        return vertex;
-      }
+    return Contexts.unmodifiableContext(vAdj);
+  }
 
-      @Override public Set<V> successors() {
-        return suc;
-      }
+  public MapGraph() {
+    this.adj = Maps.newLinkedHashMap();
+  }
 
-      @Override public Set<V> predecessors() {
-        return pre;
-      }
-    };
+  public MapGraph(Set<V> vertices) {
+    this.adj = new LinkedHashMap<V, Adj>(vertices.size());
+    addAll(vertices);
   }
 
   @Override public boolean remove(@Nullable Object object) {
     return removeVertex(object) != null;
+  }
+
+  @Override public Iterator<V> iterator() {
+    final Iterator<V> backingIterator = super.iterator();
+    return new VertexIterator(backingIterator);
+  }
+
+  @Override public boolean removeAll(Collection<?> collection) {
+    return standardRemoveAll(collection);
+  }
+
+  @Override public boolean add(V v) {
+    if (adj.containsKey(v))
+      return false;
+    adj.put(v, new Adj(v));
+    return true;
+  }
+
+  @Override public boolean retainAll(Collection<?> collection) {
+    return standardRetainAll(collection);
+  }
+
+  @Override public void clear() {
+    adj.clear();
   }
 
   @Override protected Set<V> delegate() {
