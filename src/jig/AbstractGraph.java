@@ -78,7 +78,7 @@ public abstract class AbstractGraph<V> extends AbstractCollection<V> implements
     return vCxt != null && vCxt.successors().contains(w);
   }
 
-  @Override public Collection<Context<V>> contexts() {
+  @Override public Collection<? extends Context<V>> contexts() {
     if (contexts == null) {
       return contexts =
           Collections2.transform(this, new Function<V, Context<V>>() {

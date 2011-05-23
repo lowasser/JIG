@@ -2,7 +2,6 @@ package jig;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.Collection;
@@ -40,8 +39,8 @@ public final class ImmutableGraph<V> extends AbstractGraph<V> {
     return contexts.containsKey(o);
   }
 
-  @Override public Collection<Context<V>> contexts() {
-    return ImmutableList.<Context<V>> copyOf(contexts.values());
+  @Override public Collection<ImmutableContext<V>> contexts() {
+    return contexts.values();
   }
 
   private transient Integer hashCode = null;
@@ -50,8 +49,8 @@ public final class ImmutableGraph<V> extends AbstractGraph<V> {
     return (hashCode == null) ? hashCode = super.hashCode() : hashCode;
   }
 
-  @Override public Context<V> matchAny() {
-    return contexts().iterator().next();
+  @Override public ImmutableContext<V> matchAny() {
+    return (ImmutableContext<V>) super.matchAny();
   }
 
   @Override public int size() {

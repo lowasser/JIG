@@ -18,7 +18,7 @@ public interface Graph<V> extends Collection<V> {
 
   public boolean removeEdge(@Nullable Object v, @Nullable Object w);
 
-  public Collection<Context<V>> contexts();
+  public Collection<? extends Context<V>> contexts();
 
   public Set<V> vertices();
 
