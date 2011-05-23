@@ -21,4 +21,8 @@ public interface Graph<V> extends Collection<V> {
   public Collection<Context<V>> contexts();
 
   public Set<V> vertices();
+
+  public int inDegree(@Nullable Object o);
+
+  public int outDegree(@Nullable Object o);
 }

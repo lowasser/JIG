@@ -25,4 +25,12 @@ public abstract class AbstractContext<V> implements Context<V> {
       .append(" => ").append(vertex()).append(" => ").append(successors())
       .toString();
   }
+
+  @Override public int inDegree() {
+    return predecessors().size();
+  }
+
+  @Override public int outDegree() {
+    return successors().size();
+  }
 }
