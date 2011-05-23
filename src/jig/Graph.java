@@ -5,7 +5,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-public interface Graph<V> extends Collection<V> {
+public interface Graph<V> {
   public Context<V> match(@Nullable Object o);
 
   public Context<V> matchAny();
